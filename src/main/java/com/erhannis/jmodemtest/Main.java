@@ -45,7 +45,7 @@ public class Main {
                     byteArrayToDoubleArray(b, d[0]);
                     System.arraycopy(zeros, 0, d[1], 0, zeros.length);
                     FastFourierTransformer.transformInPlace(d,  DftNormalization.STANDARD, TransformType.FORWARD);
-                    final double F = 0.99;
+                    final double F = 0.9;
                     for (int i = 80; i < 90; i++) {
                         d[0][i] *= F;
                         d[1][i] *= F;
@@ -53,6 +53,9 @@ public class Main {
                         d[1][L-1-i] *= F;
                     }
                     FastFourierTransformer.transformInPlace(d, DftNormalization.STANDARD, TransformType.INVERSE);
+                    for (int i = 0; i < d.length; i++) {
+                        d[0][i] = Math.sqrt(d[0][i]*d[0][i]+d[1][i]*d[1][i]);
+                    }
                     doubleArrayToByteArray(d[0], b);
                     os.write(b);
                 }
