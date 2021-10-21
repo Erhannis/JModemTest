@@ -45,16 +45,17 @@ public class Main {
                     byteArrayToDoubleArray(b, d[0]);
                     System.arraycopy(zeros, 0, d[1], 0, zeros.length);
                     FastFourierTransformer.transformInPlace(d,  DftNormalization.STANDARD, TransformType.FORWARD);
-                    final double F = 0.9;
-                    for (int i = 80; i < 90; i++) {
-                        d[0][i] *= F;
-                        d[1][i] *= F;
+                    final double F = 0.0;
+                    for (int i = 20; i < 40; i++) {
+                        d[0][i+1] *= F;
+                        d[1][i+1] *= F;
                         d[0][L-1-i] *= F;
                         d[1][L-1-i] *= F;
                     }
                     FastFourierTransformer.transformInPlace(d, DftNormalization.STANDARD, TransformType.INVERSE);
                     for (int i = 0; i < d.length; i++) {
-                        d[0][i] = Math.sqrt(d[0][i]*d[0][i]+d[1][i]*d[1][i]);
+                        //d[0][i] = Math.sqrt(d[0][i]*d[0][i]+d[1][i]*d[1][i]);
+                        d[0][i] = MeMath.bound(d[0][i], -1, 1);
                     }
                     doubleArrayToByteArray(d[0], b);
                     os.write(b);
@@ -74,20 +75,20 @@ public class Main {
         final int SYMBOL_LEN = 2;
         InputStream is = MeUtils.incrementalStream(o -> {
             try {
-//                while (true) {
-//                    byte[] buffer = new byte[64];
-//                    double step = Math.PI / buffer.length;
-//                    double angle = Math.PI * 2;
-//                    int i = buffer.length;
-//                    while (i > 0) {
-//                        double sine = Math.sin(angle);
-//                        int sample = (int) Math.round(sine * 32767);
-//                        buffer[--i] = (byte) (sample >> 8);
-//                        buffer[--i] = (byte) sample;
-//                        angle -= step;
-//                    }
-//                    o.write(buffer);
-//                }
+                while (true) {
+                    byte[] buffer = new byte[8];
+                    double step = Math.PI / buffer.length;
+                    double angle = Math.PI * 2;
+                    int i = 0;
+                    while (i < buffer.length) {
+                        double sine = Math.sin(angle);
+                        //int sample = (int) Math.round(sine * 32767);
+                        buffer[i++] = doubleToBB(sine);
+                        buffer[i++] = doubleToBA(sine);
+                        angle += step;
+                    }
+                    o.write(buffer);
+                }
 
 //                byte[] buffer = new byte[2*3*SYMBOL_LEN*8];                
 //                for (byte b : bytes) {
@@ -132,21 +133,21 @@ public class Main {
 //                    o.write(buffer);
 //                }
 
-                byte[] buffer = new byte[200];
-                for (int i = 0; i < 100; i++) {
-                    if (i % 3 == 0) {
-                        for (int j = 0; j < buffer.length/2; j++) {
-                            buffer[j*2+0] = (byte)0x00;
-                            buffer[j*2+1] = (byte)0x80;
-                        }
-                    } else {
-                        for (int j = 0; j < buffer.length/2; j++) {
-                            buffer[j*2+0] = (byte)0xFF;
-                            buffer[j*2+1] = (byte)0x7F;
-                        }
-                    }
-                    o.write(buffer);
-                }
+//                byte[] buffer = new byte[200];
+//                for (int i = 0; i < 100; i++) {
+//                    if (i % 3 == 0) {
+//                        for (int j = 0; j < buffer.length/2; j++) {
+//                            buffer[j*2+0] = (byte)0x00;
+//                            buffer[j*2+1] = (byte)0x80;
+//                        }
+//                    } else {
+//                        for (int j = 0; j < buffer.length/2; j++) {
+//                            buffer[j*2+0] = (byte)0xFF;
+//                            buffer[j*2+1] = (byte)0x7F;
+//                        }
+//                    }
+//                    o.write(buffer);
+//                }
                 
 //                jmodem.Main.send(new ByteArrayInputStream("This is a test of the automated garbage collection chutes and ladders of every shape and size and colors of the rainbows of platinum raining from the every face and bringing the beautiful sun to life and liberty and the pursuit of greedy pots of cereal".getBytes()), new OutputSampleStream() {
 //                    double max = 0;
@@ -181,13 +182,14 @@ public class Main {
 //        }
     }
 
+    private static final int SPS = 8000;
     private static final Object LINE_LOCK = new Object();
     
     // https://stackoverflow.com/a/32891220/513038
     public static void play(InputStream is) {
         try {
             // select audio format parameters
-            AudioFormat af = new AudioFormat(8000, 16, 1, true, false);
+            AudioFormat af = new AudioFormat(SPS, 16, 1, true, false);
             SourceDataLine line;
             synchronized (LINE_LOCK) {
                 DataLine.Info info = new DataLine.Info(SourceDataLine.class, af);
@@ -220,7 +222,7 @@ public class Main {
         return MeUtils.incrementalStream(1024*16, os -> {
         try {
             // select audio format parameters
-            AudioFormat af = new AudioFormat(8000, 16, 1, true, false);
+            AudioFormat af = new AudioFormat(SPS, 16, 1, true, false);
             TargetDataLine line;
             synchronized (LINE_LOCK) {
                 DataLine.Info info = new DataLine.Info(TargetDataLine.class, af);
@@ -273,13 +275,13 @@ public class Main {
     
     public static void byteArrayToDoubleArray(byte[] b, double[] d) {
         for (int i = 0; i < d.length; i++) {
-            d[i] = ((b[i*2] << 8) + b[i*2+1]) / 32767.0;
+            d[i] = ((b[i*2+1] << 8) + b[i*2+0]) / 32767.0;
         }
     }
     
     public static byte[] doubleToBytes(double d) {
         int sample = (int) (d * 32767);
-        return new byte[]{(byte) (sample >> 8), (byte) sample};
+        return new byte[]{(byte) sample, (byte) (sample >> 8)};
     }
     
     public static byte[] doubleArrayToByteArray(double[] d) {
@@ -291,8 +293,8 @@ public class Main {
     public static void doubleArrayToByteArray(double[] d, byte[] b) {
         for (int i = 0; i < d.length; i++) {
             int sample = (int) (d[i] * 32767);
-            b[i*2+0] = (byte) (sample >> 8);
-            b[i*2+1] = (byte) sample;
+            b[i*2+1] = (byte) (sample >> 8);
+            b[i*2+0] = (byte) sample;
         }
     }
     
